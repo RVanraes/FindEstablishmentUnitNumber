@@ -113,6 +113,8 @@ class EstablishmentUnitFinder:
             
             # Convert enterprise number column to string for comparison
             kbo_df[enterprise_column] = kbo_df[enterprise_column].astype(str)
+            enterprise_number = str(enterprise_number)
+            
             filtered_df = kbo_df[kbo_df[enterprise_column] == enterprise_number].copy()
             
             return filtered_df
@@ -156,6 +158,7 @@ class EstablishmentUnitFinder:
     
     def process_single_row(self, source_row: pd.Series, kbo_df: pd.DataFrame,
                           enterprise_column: str = 'enterprise_number',
+                          kbo_enterprise_column: str = None,
                           address_column: str = 'address',
                           address_columns: List[str] = None,
                           establishment_unit_column: str = 'establishment_unit_number',
@@ -166,7 +169,8 @@ class EstablishmentUnitFinder:
         Args:
             source_row: Source data row
             kbo_df: KBO DataFrame
-            enterprise_column: Name of enterprise number column
+            enterprise_column: Name of enterprise number column in source data
+            kbo_enterprise_column: Name of enterprise number column in KBO data (defaults to enterprise_column)
             address_column: Name of source address column
             address_columns: List of KBO address columns to check
             establishment_unit_column: Name of establishment unit number column
@@ -177,6 +181,9 @@ class EstablishmentUnitFinder:
         """
         if address_columns is None:
             address_columns = ['address']
+        
+        if kbo_enterprise_column is None:
+            kbo_enterprise_column = enterprise_column
         
         result = {
             'enterprise_number': None,
@@ -212,8 +219,8 @@ class EstablishmentUnitFinder:
             source_address = source_row.get(address_column, "")
             result['source_address'] = source_address
             
-            # Step 3: Filter KBO data
-            filtered_kbo = self.filter_kbo_data(kbo_df, enterprise_number, enterprise_column)
+            # Step 3: Filter KBO data using the KBO enterprise column
+            filtered_kbo = self.filter_kbo_data(kbo_df, enterprise_number, kbo_enterprise_column)
             
             if filtered_kbo.empty:
                 result['error'] = f"No KBO data found for enterprise number: {enterprise_number}"
@@ -245,6 +252,7 @@ class EstablishmentUnitFinder:
     
     def process_data(self, source_df: pd.DataFrame, kbo_df: pd.DataFrame,
                     enterprise_column: str = 'enterprise_number',
+                    kbo_enterprise_column: str = None,
                     address_column: str = 'address',
                     address_columns: List[str] = None,
                     establishment_unit_column: str = 'establishment_unit_number',
@@ -255,7 +263,8 @@ class EstablishmentUnitFinder:
         Args:
             source_df: Source DataFrame
             kbo_df: KBO DataFrame
-            enterprise_column: Name of enterprise number column
+            enterprise_column: Name of enterprise number column in source data
+            kbo_enterprise_column: Name of enterprise number column in KBO data
             address_column: Name of source address column
             address_columns: List of KBO address columns to check
             establishment_unit_column: Name of establishment unit number column
@@ -273,8 +282,8 @@ class EstablishmentUnitFinder:
             print(f"Processing row {idx + 1} of {len(source_df)}")
             
             result = self.process_single_row(
-                row, kbo_df, enterprise_column, address_column, address_columns,
-                establishment_unit_column, source_columns_to_copy
+                row, kbo_df, enterprise_column, kbo_enterprise_column, address_column, 
+                address_columns, establishment_unit_column, source_columns_to_copy
             )
             
             # Add original row index
@@ -349,7 +358,8 @@ def main():
     results_df = finder.process_data(
         source_df, 
         kbo_df,
-        enterprise_column='Enterprise Number',
+        enterprise_column='Enterprise Number',  # Source data column
+        kbo_enterprise_column='EnterpriseNumber',  # KBO data column
         address_column='address',
         address_columns=['Address NL', 'Address FR'],
         establishment_unit_column='EntityNumber'
@@ -374,8 +384,39 @@ def main():
     
     # Save results
     output_file = "establishment_unit_results.csv"
-    results_df.to_csv(output_file, index=False)
+    results_df.to_csv(output_file, index=False, sep=';')
     print(f"Results saved to: {output_file}")
+    
+    # Save to Excel with multiple sheets
+    excel_file = "establishment_unit_results.xlsx"
+    with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
+        # Results sheet
+        results_df.to_excel(writer, sheet_name='Results', index=False)
+        
+        # Source data sheet
+        source_df.to_excel(writer, sheet_name='Source_Data', index=False)
+        
+        # KBO data sheet  
+        kbo_df.to_excel(writer, sheet_name='KBO_Data', index=False)
+        
+        # Summary statistics sheet
+        summary_stats = pd.DataFrame({
+            'Metric': [
+                'Total Rows Processed',
+                'Successful Matches', 
+                'Success Rate (%)',
+                'Average Dice Score'
+            ],
+            'Value': [
+                len(results_df),
+                len(results_df[results_df['success']]),
+                f"{len(results_df[results_df['success']])/len(results_df)*100:.1f}",
+                f"{results_df[results_df['success']]['dice_score'].mean():.3f}" if len(results_df[results_df['success']]) > 0 else "N/A"
+            ]
+        })
+        summary_stats.to_excel(writer, sheet_name='Summary', index=False)
+    
+    print(f"Excel file saved to: {excel_file}")
 
 
 if __name__ == "__main__":

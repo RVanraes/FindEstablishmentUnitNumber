@@ -115,16 +115,32 @@ FindEstablishmentUnitNumber/
 
 ## Output
 
-The application generates a CSV file with the following columns:
+The application generates comprehensive output in two formats:
 
-- `source_row_index`: Index of the original source row
+### 1. CSV File (Semicolon-delimited)
+- **Delimiter**: Semicolon (`;`) for better compatibility with European data standards
+- **File**: `establishment_unit_results.csv`
+- **Content**: All results with detailed matching information
+
+### 2. Excel File (Multi-sheet)
+- **File**: `establishment_unit_results.xlsx`
+- **Sheets**:
+  - **Results**: Complete matching results with all columns
+  - **Source_Data_Sample**: Sample of source data (first 1000 rows for large datasets)
+  - **Summary**: Statistical summary and performance metrics
+
+### Output Columns
+
 - `enterprise_number`: Enterprise number from source data
 - `source_address`: Original address from source data
 - `best_match_address`: Best matching address from KBO data
+- `best_match_address_column`: Which address column provided the best match (NL/FR)
 - `dice_score`: Similarity score (0.0 to 1.0)
 - `establishment_unit_number`: Found establishment unit number
 - `success`: Whether a match was found
 - `error`: Error message if processing failed
+- `source_*`: All original source columns with 'source_' prefix
+- `source_row_index`: Index of the original source row
 
 ## Configuration Options
 
