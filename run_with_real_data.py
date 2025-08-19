@@ -17,9 +17,12 @@ def load_real_data():
         print(f"Loading source data from: {Config.SOURCE_DATA_PATH}")
         source_df = pd.read_csv(Config.SOURCE_DATA_PATH)
         
-        # Load KBO data
+        # Load KBO data - try different separators
         print(f"Loading KBO data from: {Config.KBO_DATA_PATH}")
-        kbo_df = pd.read_csv(Config.KBO_DATA_PATH)
+        try:
+            kbo_df = pd.read_csv(Config.KBO_DATA_PATH, sep=';')
+        except Exception:
+            kbo_df = pd.read_csv(Config.KBO_DATA_PATH)
         
         return source_df, kbo_df
     
@@ -47,11 +50,8 @@ def validate_data_structure(source_df, kbo_df):
         errors.append(f"Missing columns in source data: {missing_source_cols}")
     
     # Check KBO data columns
-    required_kbo_cols = [
-        Config.KBO_ENTERPRISE_COLUMN, 
-        Config.KBO_ADDRESS_COLUMN, 
-        Config.KBO_ESTABLISHMENT_UNIT_COLUMN
-    ]
+    required_kbo_cols = [Config.KBO_ENTERPRISE_COLUMN, Config.KBO_ESTABLISHMENT_UNIT_COLUMN]
+    required_kbo_cols.extend(Config.KBO_ADDRESS_COLUMNS)
     missing_kbo_cols = [col for col in required_kbo_cols if col not in kbo_df.columns]
     
     if missing_kbo_cols:
@@ -63,6 +63,7 @@ def validate_data_structure(source_df, kbo_df):
             print(f"  - {error}")
         print("\nAvailable columns in source data:", list(source_df.columns))
         print("Available columns in KBO data:", list(kbo_df.columns))
+        print(f"Expected KBO address columns: {Config.KBO_ADDRESS_COLUMNS}")
         return False
     
     return True
@@ -135,7 +136,9 @@ def main():
         kbo_df,
         enterprise_column=Config.SOURCE_ENTERPRISE_COLUMN,
         address_column=Config.SOURCE_ADDRESS_COLUMN,
-        establishment_unit_column=Config.KBO_ESTABLISHMENT_UNIT_COLUMN
+        address_columns=Config.KBO_ADDRESS_COLUMNS,
+        establishment_unit_column=Config.KBO_ESTABLISHMENT_UNIT_COLUMN,
+        source_columns_to_copy=Config.SOURCE_COLUMNS_TO_COPY
     )
     
     # Analyze results
@@ -154,6 +157,7 @@ def main():
         print(f"Row {result['source_row_index'] + 1}:")
         print(f"  Enterprise: {result['enterprise_number']}")
         print(f"  Dice Score: {result['dice_score']:.3f}")
+        print(f"  Best Match Column: {result.get('best_match_address_column', 'N/A')}")
         print(f"  Establishment Unit: {result['establishment_unit_number']}")
         print(f"  Success: {result['success']}")
         print()
