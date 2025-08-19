@@ -209,7 +209,7 @@ class EstablishmentUnitFinder:
         try:
             # Step 1: Extract enterprise number
             enterprise_number = self.extract_enterprise_number(source_row, enterprise_column)
-            result['enterprise_number'] = enterprise_number
+            result['enterprise_number'] = str(enterprise_number) if enterprise_number is not None else None
             
             if enterprise_number is None:
                 result['error'] = "No enterprise number found in source row"
@@ -240,8 +240,15 @@ class EstablishmentUnitFinder:
                     if addr_col in best_match and str(best_match[addr_col]) == str(best_address):
                         result['best_match_address_column'] = addr_col
                         break
-                result['establishment_unit_number'] = best_match.get(establishment_unit_column)
-                result['success'] = True
+                result['establishment_unit_number'] = str(best_match.get(establishment_unit_column)) if best_match.get(establishment_unit_column) is not None else None
+                
+                # Only mark as successful if dice score meets threshold
+                from config import Config
+                if dice_score >= Config.MIN_DICE_THRESHOLD:
+                    result['success'] = True
+                else:
+                    result['success'] = False
+                    result['error'] = f"Match found but dice score ({dice_score:.3f}) below threshold ({Config.MIN_DICE_THRESHOLD})"
             else:
                 result['error'] = "No matching address found"
             

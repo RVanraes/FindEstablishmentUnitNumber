@@ -13,20 +13,26 @@ def load_real_data():
     Modify this function to match your data sources.
     """
     try:
-        # Load source data - try different separators
+        # Load source data - try different separators, ensure enterprise numbers are strings
         print(f"Loading source data from: {Config.SOURCE_DATA_PATH}")
         try:
-            source_df = pd.read_csv(Config.SOURCE_DATA_PATH, sep=';')
+            source_df = pd.read_csv(Config.SOURCE_DATA_PATH, sep=';', dtype={Config.SOURCE_ENTERPRISE_COLUMN: str})
         except Exception:
-            source_df = pd.read_csv(Config.SOURCE_DATA_PATH)
-        
-        # Load KBO data - try different separators
+            source_df = pd.read_csv(Config.SOURCE_DATA_PATH, dtype={Config.SOURCE_ENTERPRISE_COLUMN: str})
+
+        # Load KBO data - try different separators, ensure enterprise and entity numbers are strings
         print(f"Loading KBO data from: {Config.KBO_DATA_PATH}")
         try:
-            kbo_df = pd.read_csv(Config.KBO_DATA_PATH, sep=';')
+            kbo_df = pd.read_csv(Config.KBO_DATA_PATH, sep=';', dtype={
+                Config.KBO_ENTERPRISE_COLUMN: str, 
+                Config.KBO_ESTABLISHMENT_UNIT_COLUMN: str
+            })
         except Exception:
-            kbo_df = pd.read_csv(Config.KBO_DATA_PATH)
-        
+            kbo_df = pd.read_csv(Config.KBO_DATA_PATH, dtype={
+                Config.KBO_ENTERPRISE_COLUMN: str, 
+                Config.KBO_ESTABLISHMENT_UNIT_COLUMN: str
+            })
+
         return source_df, kbo_df
     
     except FileNotFoundError as e:
