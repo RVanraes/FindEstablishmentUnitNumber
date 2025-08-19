@@ -13,13 +13,19 @@ def load_real_data():
     Modify this function to match your data sources.
     """
     try:
-        # Load source data
+        # Load source data - try different separators
         print(f"Loading source data from: {Config.SOURCE_DATA_PATH}")
-        source_df = pd.read_csv(Config.SOURCE_DATA_PATH)
+        try:
+            source_df = pd.read_csv(Config.SOURCE_DATA_PATH, sep=';')
+        except Exception:
+            source_df = pd.read_csv(Config.SOURCE_DATA_PATH)
         
-        # Load KBO data
+        # Load KBO data - try different separators
         print(f"Loading KBO data from: {Config.KBO_DATA_PATH}")
-        kbo_df = pd.read_csv(Config.KBO_DATA_PATH)
+        try:
+            kbo_df = pd.read_csv(Config.KBO_DATA_PATH, sep=';')
+        except Exception:
+            kbo_df = pd.read_csv(Config.KBO_DATA_PATH)
         
         return source_df, kbo_df
     
@@ -47,11 +53,8 @@ def validate_data_structure(source_df, kbo_df):
         errors.append(f"Missing columns in source data: {missing_source_cols}")
     
     # Check KBO data columns
-    required_kbo_cols = [
-        Config.KBO_ENTERPRISE_COLUMN, 
-        Config.KBO_ADDRESS_COLUMN, 
-        Config.KBO_ESTABLISHMENT_UNIT_COLUMN
-    ]
+    required_kbo_cols = [Config.KBO_ENTERPRISE_COLUMN, Config.KBO_ESTABLISHMENT_UNIT_COLUMN]
+    required_kbo_cols.extend(Config.KBO_ADDRESS_COLUMNS)
     missing_kbo_cols = [col for col in required_kbo_cols if col not in kbo_df.columns]
     
     if missing_kbo_cols:
@@ -63,6 +66,7 @@ def validate_data_structure(source_df, kbo_df):
             print(f"  - {error}")
         print("\nAvailable columns in source data:", list(source_df.columns))
         print("Available columns in KBO data:", list(kbo_df.columns))
+        print(f"Expected KBO address columns: {Config.KBO_ADDRESS_COLUMNS}")
         return False
     
     return True
@@ -134,8 +138,11 @@ def main():
         source_df, 
         kbo_df,
         enterprise_column=Config.SOURCE_ENTERPRISE_COLUMN,
+        kbo_enterprise_column=Config.KBO_ENTERPRISE_COLUMN,
         address_column=Config.SOURCE_ADDRESS_COLUMN,
-        establishment_unit_column=Config.KBO_ESTABLISHMENT_UNIT_COLUMN
+        address_columns=Config.KBO_ADDRESS_COLUMNS,
+        establishment_unit_column=Config.KBO_ESTABLISHMENT_UNIT_COLUMN,
+        source_columns_to_copy=Config.SOURCE_COLUMNS_TO_COPY
     )
     
     # Analyze results
@@ -143,7 +150,40 @@ def main():
     
     # Save results
     print(f"\nSaving results to: {Config.OUTPUT_PATH}")
-    results_df.to_csv(Config.OUTPUT_PATH, index=False)
+    results_df.to_csv(Config.OUTPUT_PATH, index=False, sep=Config.OUTPUT_CSV_DELIMITER)
+    
+    # Save to Excel with multiple sheets
+    print(f"Saving Excel file to: {Config.OUTPUT_EXCEL_PATH}")
+    with pd.ExcelWriter(Config.OUTPUT_EXCEL_PATH, engine='openpyxl') as writer:
+        # Results sheet
+        results_df.to_excel(writer, sheet_name='Results', index=False)
+        
+        # Source data sheet (first 1000 rows to avoid file size issues)
+        source_sample = source_df.head(1000) if len(source_df) > 1000 else source_df
+        source_sample.to_excel(writer, sheet_name='Source_Data_Sample', index=False)
+        
+        # Summary statistics sheet
+        summary_stats = pd.DataFrame({
+            'Metric': [
+                'Total Rows Processed',
+                'Successful Matches',
+                'Success Rate (%)',
+                'High Confidence Matches',
+                'High Confidence Rate (%)',
+                'Average Dice Score',
+                'Threshold Used'
+            ],
+            'Value': [
+                len(results_df),
+                len(results_df[results_df['success']]),
+                f"{len(results_df[results_df['success']])/len(results_df)*100:.1f}",
+                len(results_df[results_df['dice_score'] >= Config.MIN_DICE_THRESHOLD]),
+                f"{len(results_df[results_df['dice_score'] >= Config.MIN_DICE_THRESHOLD])/len(results_df)*100:.1f}",
+                f"{results_df[results_df['success']]['dice_score'].mean():.3f}" if len(results_df[results_df['success']]) > 0 else "N/A",
+                Config.MIN_DICE_THRESHOLD
+            ]
+        })
+        summary_stats.to_excel(writer, sheet_name='Summary', index=False)
     
     # Display sample results
     print("\nSample results (first 5 rows):")
@@ -154,6 +194,7 @@ def main():
         print(f"Row {result['source_row_index'] + 1}:")
         print(f"  Enterprise: {result['enterprise_number']}")
         print(f"  Dice Score: {result['dice_score']:.3f}")
+        print(f"  Best Match Column: {result.get('best_match_address_column', 'N/A')}")
         print(f"  Establishment Unit: {result['establishment_unit_number']}")
         print(f"  Success: {result['success']}")
         print()
